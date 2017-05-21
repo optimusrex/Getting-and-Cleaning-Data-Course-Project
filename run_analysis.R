@@ -1,75 +1,77 @@
-require(plyr)
+library(plyr)
 
-# Directories and files
-uci_hard_dir <- "UCI\ HAR\ Dataset"
-feature_file <- paste(uci_hard_dir, "/features.txt", sep = "")
-activity_labels_file <- paste(uci_hard_dir, "/activity_labels.txt", sep = "")
-x_train_file <- paste(uci_hard_dir, "/train/X_train.txt", sep = "")
-y_train_file <- paste(uci_hard_dir, "/train/y_train.txt", sep = "")
-subject_train_file <- paste(uci_hard_dir, "/train/subject_train.txt", sep = "")
-x_test_file  <- paste(uci_hard_dir, "/test/X_test.txt", sep = "")
-y_test_file  <- paste(uci_hard_dir, "/test/y_test.txt", sep = "")
-subject_test_file <- paste(uci_hard_dir, "/test/subject_test.txt", sep = "")
+# 0. Downloading dataset
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+download.file(fileUrl,destfile="./data/Dataset.zip")
 
-# Load raw data
-features <- read.table(feature_file, colClasses = c("character"))
-activity_labels <- read.table(activity_labels_file, col.names = c("ActivityId", "Activity"))
-x_train <- read.table(x_train_file)
-y_train <- read.table(y_train_file)
-subject_train <- read.table(subject_train_file)
-x_test <- read.table(x_test_file)
-y_test <- read.table(y_test_file)
-subject_test <- read.table(subject_test_file)
+# Unzip dataSet to /data directory
+unzip(zipfile="./data/Dataset.zip",exdir="./data")
 
-##################################################################
-# 1. Merges the training and the test sets to create one data set.
-##################################################################
 
-# Binding sensor data
-training_sensor_data <- cbind(cbind(x_train, subject_train), y_train)
-test_sensor_data <- cbind(cbind(x_test, subject_test), y_test)
-sensor_data <- rbind(training_sensor_data, test_sensor_data)
+# 1. Merging the training and the test sets to create one data set:
 
-# Label columns
-sensor_labels <- rbind(rbind(features, c(562, "Subject")), c(563, "ActivityId"))[,2]
-names(sensor_data) <- sensor_labels
+  # 1.1 Reading files
 
-############################################################################################
-# 2. Extracts only the measurements on the mean and standard deviation for each measurement.
-############################################################################################
-
-sensor_data_mean_std <- sensor_data[,grepl("mean|std|Subject|ActivityId", names(sensor_data))]
-
-###########################################################################
-# 3. Uses descriptive activity names to name the activities in the data set
-###########################################################################
-
-sensor_data_mean_std <- join(sensor_data_mean_std, activity_labels, by = "ActivityId", match = "first")
-sensor_data_mean_std <- sensor_data_mean_std[,-1]
-
-##############################################################
-# 4. Appropriately labels the data set with descriptive names.
-##############################################################
-
-# Remove parentheses
-names(sensor_data_mean_std) <- gsub('\\(|\\)',"",names(sensor_data_mean_std), perl = TRUE)
-# Make syntactically valid names
-names(sensor_data_mean_std) <- make.names(names(sensor_data_mean_std))
-# Make clearer names
-names(sensor_data_mean_std) <- gsub('Acc',"Acceleration",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('GyroJerk',"AngularAcceleration",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('Gyro',"AngularSpeed",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('Mag',"Magnitude",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('^t',"TimeDomain.",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('^f',"FrequencyDomain.",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('\\.mean',".Mean",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('\\.std',".StandardDeviation",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('Freq\\.',"Frequency.",names(sensor_data_mean_std))
-names(sensor_data_mean_std) <- gsub('Freq$',"Frequency",names(sensor_data_mean_std))
-
-######################################################################################################################
-# 5. Creates a second, independent tidy data set with the average of each variable for each activity and each subject.
-######################################################################################################################
-
-sensor_avg_by_act_sub = ddply(sensor_data_mean_std, c("Subject","Activity"), numcolwise(mean))
-write.table(sensor_avg_by_act_sub, file = "sensor_avg_by_act_sub.txt")
+    # 1.1.1 Reading trainings tables:
+      x_train <- read.table("./data/UCI HAR Dataset/train/X_train.txt")
+      y_train <- read.table("./data/UCI HAR Dataset/train/y_train.txt")
+      subject_train <- read.table("./data/UCI HAR Dataset/train/subject_train.txt")
+      
+    # 1.1.2 Reading testing tables:
+      x_test <- read.table("./data/UCI HAR Dataset/test/X_test.txt")
+      y_test <- read.table("./data/UCI HAR Dataset/test/y_test.txt")
+      subject_test <- read.table("./data/UCI HAR Dataset/test/subject_test.txt")
+      
+    # 1.1.3 Reading feature vector:
+      features <- read.table('./data/UCI HAR Dataset/features.txt')
+      
+    # 1.1.4 Reading activity labels:
+      activityLabels = read.table('./data/UCI HAR Dataset/activity_labels.txt')
+      
+  # 1.2 Assigning column names:
+      colnames(x_train) <- features[,2] 
+      colnames(y_train) <-"activityId"
+      colnames(subject_train) <- "subjectId"
+      
+      colnames(x_test) <- features[,2] 
+      colnames(y_test) <- "activityId"
+      colnames(subject_test) <- "subjectId"
+      
+      colnames(activityLabels) <- c('activityId','activityType')
+      
+  # 1.3 Merging all data in one set:
+      mrg_train <- cbind(y_train, subject_train, x_train)
+      mrg_test <- cbind(y_test, subject_test, x_test)
+      setAllInOne <- rbind(mrg_train, mrg_test)
+      
+# 2. Extracting only the measurements on the mean and standard deviation for each measurement
+  
+  # 2.1 Reading column names:
+      colNames <- colnames(setAllInOne)
+      
+  # 2.2 Create vector for defining ID, mean and standard deviation:
+      mean_and_std <- (grepl("activityId" , colNames) | 
+                       grepl("subjectId" , colNames) | 
+                       grepl("mean.." , colNames) | 
+                       grepl("std.." , colNames) 
+                      )
+      
+  # 2.3 Making nessesary subset from setAllInOne:
+      setForMeanAndStd <- setAllInOne[ , mean_and_std == TRUE]
+      
+# 3. Using descriptive activity names to name the activities in the data set:
+      setWithActivityNames <- merge(setForMeanAndStd, activityLabels,
+                                   by='activityId',
+                                   all.x=TRUE)
+      
+# 4. Appropriately labeling the data set with descriptive variable names.
+      
+# 5. Creating a second, independent tidy data set with the average of each variable for each activity and each subject:
+      
+      # 5.1 Making second tidy data set 
+      secTidySet <- aggregate(. ~subjectId + activityId, setWithActivityNames, mean)
+      secTidySet <- secTidySet[order(secTidySet$subjectId, secTidySet$activityId),]
+      
+      # 5.2 Writing second tidy data set in txt file
+      write.table(secTidySet, "secTidySet.txt", row.name=FALSE)
